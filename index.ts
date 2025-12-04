@@ -1,0 +1,70 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { register, login } from './autenticacion/controlador_aut';
+import { getStreams, startStream, stopStream } from './streams/controlador';
+import nivelesRoutes from './niveles/routes';
+import { PrismaClient } from './generated/prisma/index.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { obtenerRegalos, crearRegalo, enviarRegalo } from './regalos/controlador_regalo';
+import pg from 'pg';
+import { verificarToken } from './autenticacion/middleware';
+
+const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+});
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+dotenv.config();
+
+const app = express();
+
+app.use(express.json());
+
+// CORS configuration for GitHub Pages (and dev if needed)
+const allowedOrigins = ['https://20222396-wq.github.io'];
+app.use((req, res, next) => {
+    const origin = req.headers.origin as string | undefined;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+    }
+    next();
+});
+
+app.get('/', (req, res) => {
+    res.send('API Streaming funcionando 🚀');
+});
+
+// Health endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
+
+// Auth endpoints for /api/* as requested
+app.post('/api/register', register);
+app.post('/api/login', login);
+
+app.get('/api/streams', getStreams);       
+app.post('/api/streams/start', startStream); 
+app.delete('/api/streams/stop/:id', stopStream); 
+
+app.use('/api/streamer', nivelesRoutes);
+app.get('/api/regalos/:streamerId', obtenerRegalos);
+app.post('/api/regalos/crear', verificarToken, crearRegalo); // Necesita estar logueado
+app.post('/api/regalos/enviar', verificarToken, enviarRegalo); // Necesita estar logueado
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+});
+

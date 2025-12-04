@@ -1,0 +1,93 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- TUS MODELOS ---
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  name     String
+  password String 
+  
+  // Gamification
+  coins  Int   @default(0)
+  points Int   @default(0)
+  
+  // Streamer info
+  streamingHours Float @default(0)
+  
+  // Relaciones
+  currentLevelId String? 
+  currentLevel   StreamerLevel? @relation(fields: [currentLevelId], references: [id])
+  
+  streams          Stream[] 
+  regalosCreados   Regalo[] // Relación inversa de regalos
+}
+
+model StreamerLevel {
+  id               String  @id @default(uuid())
+  nombre           String  @unique // Mercurio, Venus...
+  puntosRequeridos Int
+  recompensa       String?
+  image            String?
+  
+  users            User[]
+  @@map("streamer_levels")
+}
+
+model Regalo {
+  id          String  @id @default(uuid())
+  nombre      String
+  costo       Int
+  puntos      Int
+  icono       String
+  activo      Boolean @default(true)
+  
+  streamerId  String
+  streamer    User    @relation(fields: [streamerId], references: [id])
+  @@map("regalos")
+}
+
+model Stream {
+  id           String   @id @default(uuid())
+  title        String
+  isLive       Boolean  @default(false)
+  
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  
+  tags         StreamTag[]
+  @@map("streams")
+}
+
+model Tag {
+  id      String      @id @default(uuid())
+  name    String      @unique
+  streams StreamTag[]
+  @@map("tags")
+}
+
+model StreamTag {
+  streamId String
+  tagId    String
+  stream   Stream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([streamId, tagId])
+  @@map("stream_tags")
+}
+
+// Modelos extra de tu proyecto (si los usas)
+model Monedas {
+  id        Int     @id @default(autoincrement())
+  saldo     Int     @default(0)
+  usuarioId String     @unique // Ojo: usuarioId ahora es String en User
+  // Ajusta la relación si usas esta tabla, o usa el campo 'coins' de User directamente.
+}
